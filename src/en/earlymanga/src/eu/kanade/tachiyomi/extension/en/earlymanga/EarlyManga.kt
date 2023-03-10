@@ -83,25 +83,18 @@ class EarlyManga : HttpSource() {
         filters.forEach { filter ->
             when (filter) {
                 is GenreFilter -> {
-                    val includeGenres = filter.state
-                        .filter { it.state == STATE_INCLUDE }
-                        .map { it.name }
-                    allIncludeGenres.addAll(includeGenres)
-
-                    val excludeGenres = filter.state
-                        .filter { it.state == STATE_EXCLUDE }
-                        .map { it.name }
-                    allExcludeGenres.addAll(excludeGenres)
+                    filter.state.forEach { genreState ->
+                        when (genreState.state) {
+                            STATE_INCLUDE -> allIncludeGenres.add(genreState.name)
+                            STATE_EXCLUDE -> allExcludeGenres.add(genreState.name)
+                        }
+                    }
                 }
                 is TypeFilter -> {
-                    val includeTypes = filter.getValue()
-                    includedLanguages.addAll(includeTypes)
+                    includedLanguages.addAll(filter.getValue())
                 }
                 is StatusFilter -> {
-                    val includeStatus = filter.state
-                        .filter { it.state }
-                        .map { it.name }
-                    includedPubstatus.addAll(includeStatus)
+                    includedPubstatus.addAll(filter.state.filter { it.state }.map { it.name })
                 }
                 is OrderByFilter -> {
                     listType = filter.values[filter.state]
@@ -149,6 +142,7 @@ class EarlyManga : HttpSource() {
         )
     }
 
+    /* Filters */
     private var genresMap: Map<String, List<String>> = emptyMap()
 
     private val orderByFilterOptions: List<String> = listOf(
@@ -250,12 +244,12 @@ class EarlyManga : HttpSource() {
 
         val result = mutableMapOf<String, List<String>>()
 
-        result["Genres"] = filterResponse.genres.map { it.name } //
-        result["Sub Genres"] = filterResponse.sub_genres.map { it.name } //
-        result["Content"] = filterResponse.contents.map { it.name } //
-        result["Demographic"] = filterResponse.demographics.map { it.name } //
-        result["Format"] = filterResponse.formats.map { it.name } //
-        result["Themes"] = filterResponse.themes.map { it.name } //
+        result["Genres"] = filterResponse.genres.map { it.name }
+        result["Sub Genres"] = filterResponse.sub_genres.map { it.name }
+        result["Content"] = filterResponse.contents.map { it.name }
+        result["Demographic"] = filterResponse.demographics.map { it.name }
+        result["Format"] = filterResponse.formats.map { it.name }
+        result["Themes"] = filterResponse.themes.map { it.name }
 
         return result
     }
