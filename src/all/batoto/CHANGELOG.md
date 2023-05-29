@@ -1,3 +1,25 @@
+## 1.4.32
+
+### Refactor
+
+* Complete rewrite for bato v3x
+
+### Features
+
+* Add mirror: comiko.org
+* Add mirror: batocomic.com
+* Add mirror: batocomic.net
+* Add mirror: batocomic.org
+* Add mirror: readtoto.com
+* Add mirror: readtoto.net
+* Add mirror: readtoto.org
+* Add mirror: xbato.com
+* Add mirror: xbato.net
+* Add mirror: xbato.org
+* Add mirror: zbato.com
+* Add mirror: zbato.net
+* Add mirror: zbato.org
+
 ## 1.3.30
 
 ### Refactor

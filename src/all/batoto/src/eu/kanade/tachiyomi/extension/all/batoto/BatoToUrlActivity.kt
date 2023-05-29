@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import eu.kanade.tachiyomi.extension.all.batoto.BatoTo.Companion.SEARCH_PREFIX
 import kotlin.system.exitProcess
 
 class BatoToUrlActivity : Activity() {
@@ -42,8 +43,8 @@ class BatoToUrlActivity : Activity() {
 
     private fun fromBatoTo(pathSegments: MutableList<String>): String? {
         return if (pathSegments.size >= 2) {
-            val id = pathSegments[1]
-            "ID:$id"
+            val id = pathSegments[1].substringBefore("-")
+            "$SEARCH_PREFIX$id"
         } else {
             null
         }

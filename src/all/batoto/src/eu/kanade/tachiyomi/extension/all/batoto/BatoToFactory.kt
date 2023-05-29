@@ -7,11 +7,13 @@ class BatoToFactory : SourceFactory {
     override fun createSources(): List<Source> = languages.map { BatoTo(it.lang, it.siteLang) }
 }
 
-class LanguageOption(val lang: String, val siteLang: String = lang)
+class LanguageOption(val lang: String, val siteLang: List<String>) {
+    constructor(lang: String, siteLang: String = lang) : this(lang, listOf(siteLang))
+}
+
 private val languages = listOf(
-    LanguageOption("all", ""),
-    // Lang options from publish.bato.to
-    LanguageOption("en"),
+    LanguageOption("all", emptyList()),
+    LanguageOption("en", listOf("en", "en_us")),
     LanguageOption("ar"),
     LanguageOption("bg"),
     LanguageOption("zh"),
@@ -58,7 +60,6 @@ private val languages = listOf(
     LanguageOption("zh-Hans", "zh_hk"),
     LanguageOption("zh-Hant", "zh_tw"),
     LanguageOption("hr"),
-    LanguageOption("en-US", "en_us"),
     LanguageOption("eo"),
     LanguageOption("et"),
     LanguageOption("fo"),
@@ -114,9 +115,6 @@ private val languages = listOf(
     LanguageOption("yo"),
     LanguageOption("zu"),
     LanguageOption("other", "_t"),
-    // Lang options from bato.to brows not in publish.bato.to
     LanguageOption("eu"),
     LanguageOption("pt-PT", "pt_pt"),
-    // Lang options that got removed
-    // Pair("xh", "xh"),
 )
