@@ -30,7 +30,6 @@ import org.jsoup.nodes.Element
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import uy.kohesive.injekt.injectLazy
 
 class Koushoku : ParsedHttpSource(), ConfigurableSource {
 
@@ -51,7 +50,12 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     override fun headersBuilder() = super.headersBuilder()
         .add("Referer", "$baseUrl/")
 
-    private val json: Json by injectLazy()
+    private val json: Json by lazy {
+        Json {
+            isLenient = true
+            ignoreUnknownKeys = true
+        }
+    }
 
     private val preference: SharedPreferences by lazy {
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
@@ -177,17 +181,15 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
 
         val script = document.select("script:containsData(window.metadata)").html()
             .substringAfter("=")
-            .substringBeforeLast(",").let { "$it}" }
-            .replace("original", "\"original\"")
-            .replace("resampled", "\"resampled\"")
+            .substringBeforeLast(",")
+            .let { "$it}" }
 
         val availableImages = json.decodeFromString<ImageQualities>(script)
 
-        val (selectedImages, quality) = when (preference.imageQuality) {
-            "original" -> availableImages.original to "original"
-            "resampled" -> availableImages.resampled to "resampled"
-            else -> emptyList<Image>() to ""
-        }
+        val quality = preference.imageQuality
+        val selectedImages = availableImages[quality]
+            ?: availableImages.original
+            ?: emptyList()
 
         return selectedImages.mapIndexed { idx, img ->
             Page(
@@ -199,9 +201,17 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
 
     @Serializable
     data class ImageQualities(
-        val original: List<Image>,
-        val resampled: List<Image>,
-    )
+        val original: List<Image>? = emptyList(),
+        val resampled: List<Image>? = emptyList(),
+    ) {
+        operator fun get(key: String): List<Image>? {
+            return when (key) {
+                "original" -> original
+                "resampled" -> resampled
+                else -> null
+            }
+        }
+    }
 
     @Serializable
     data class Image(
