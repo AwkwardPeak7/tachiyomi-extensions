@@ -222,10 +222,10 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
             .substringAfter("/read/")
             .substringBeforeLast("/")
 
-        val cdnUrl = document.select("meta[itemprop=image]")
-            .attr("content")
-            .baseUrl()
-            .let { it.takeIf { it.isNotEmpty() } ?: baseUrl }
+        val cdnUrl = document.selectFirst("meta[itemprop=image]")
+            ?.attr("content")
+            ?.baseUrl()
+            ?: baseUrl
 
         val script = document.select("script:containsData(window.metadata)").html()
             .substringAfter("=")
@@ -235,9 +235,8 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         val availableImages = json.decodeFromString<ImageQualities>(script)
 
         val quality = preference.imageQuality
-        val selectedImages = availableImages[quality]
-            ?: availableImages.original
-            ?: emptyList()
+
+        val selectedImages = availableImages[quality] ?: emptyList()
 
         return selectedImages.mapIndexed { idx, img ->
             Page(
@@ -267,8 +266,8 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     )
 
     private fun String.baseUrl(): String {
-        val index = this.indexOf('/', this.indexOf("//") + 2)
-        return this.substring(0, index)
+        val url = this.toHttpUrl()
+        return "${url.scheme}://${url.host}"
     }
 
     private fun Call.asObservableIgnoreCode(code: Int): Observable<Response> {
@@ -281,7 +280,12 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     }
 
     private fun String.page(page: Int): String {
-        return "$this${if (page > 1) "/page/$page" else ""}"
+        return this +
+            if (page > 1) {
+                "/page/$page"
+            } else {
+                ""
+            }
     }
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
@@ -302,7 +306,7 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         private val pageNumRegex by lazy { Regex("""(\d+)\w+""") }
         private const val qualityPref = "pref_image_quality"
         const val PREFIX_ID = "id:"
-        const val PREFIX_PAGE = "page:"
+        const val PREFIX_PAGE = "browse:"
     }
 
     // unused
