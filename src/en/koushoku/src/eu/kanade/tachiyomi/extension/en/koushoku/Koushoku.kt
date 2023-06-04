@@ -6,6 +6,7 @@ import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.asObservable
+import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.network.interceptor.rateLimit
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -77,7 +78,7 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         author = element.select("h3 span:nth-child(1)").text()
         genre = element.select("footer span").joinToString { it.text() }
         description = element.select("header div").text().let {
-            "Length: ${it.replace(pageNumRegex, "$1")} pages"
+            "Length: ${it.replace(pageNumRegex, "$1")} Pages"
         }
         status = SManga.COMPLETED
         update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
@@ -94,9 +95,34 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     override fun latestUpdatesFromElement(element: Element) = popularMangaFromElement(element)
 
     override fun fetchSearchManga(page: Int, query: String, filters: FilterList): Observable<MangasPage> {
-        return client.newCall(searchMangaRequest(page, query, filters))
-            .asObservableIgnoreCode(404)
-            .map { searchMangaParse(it) }
+        return if (query.startsWith(PREFIX_ID)) {
+            val url = "/view/${query.substringAfter(PREFIX_ID)}"
+            val manga = SManga.create().apply { this.url = url }
+            fetchMangaDetails(manga).map {
+                MangasPage(
+                    listOf(it.apply { this.url = url }),
+                    false,
+                )
+            }
+        } else if (query.startsWith(PREFIX_PAGE)) {
+            val pathSegment = query.substringAfter(PREFIX_PAGE)
+            client.newCall(browsePageRequest(pathSegment, page))
+                .asObservableSuccess()
+                .map { searchMangaParse(it) }
+        } else {
+            client.newCall(searchMangaRequest(page, query, filters))
+                .asObservableIgnoreCode(404)
+                .map { searchMangaParse(it) }
+        }
+    }
+
+    private fun browsePageRequest(pathSegment: String, page: Int): Request {
+        val url = baseUrl.toHttpUrl().newBuilder().apply {
+            addEncodedPathSegments(pathSegment)
+            if (page > 1) addPathSegment("page/$page")
+        }.build()
+
+        return GET(url, headers)
     }
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
@@ -133,12 +159,6 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         return GET(url.build(), headers)
     }
 
-    override fun getFilterList() = filters
-
-    override fun searchMangaSelector() = popularMangaSelector()
-    override fun searchMangaNextPageSelector() = popularMangaNextPageSelector()
-    override fun searchMangaFromElement(element: Element) = popularMangaFromElement(element)
-
     override fun searchMangaParse(response: Response): MangasPage {
         val peekedBody = response.peekBody(Long.MAX_VALUE)
         val document = Jsoup.parse(peekedBody.string())
@@ -152,8 +172,36 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         }
     }
 
+    override fun searchMangaSelector() = popularMangaSelector()
+    override fun searchMangaNextPageSelector() = popularMangaNextPageSelector()
+    override fun searchMangaFromElement(element: Element) = popularMangaFromElement(element)
+    override fun getFilterList() = filters
+
     override fun fetchMangaDetails(manga: SManga): Observable<SManga> {
-        return Observable.just(manga)
+        return if (manga.initialized) {
+            Observable.just(manga)
+        } else {
+            super.fetchMangaDetails(manga)
+        }
+    }
+
+    override fun mangaDetailsParse(document: Document) = SManga.create().apply {
+        title = document.select("#metadata h1").text()
+        thumbnail_url = document.select("#cover img").attr("abs:src")
+        author = document.select(
+            "#metadata a[href^='/circles/'] span:nth-child(1), " +
+                "#metadata a[href^='/artists/'] span:nth-child(1)",
+        ).joinToString { it.text().trim() }
+        genre = document.select(
+            "#metadata a[href^=/tags] span:nth-child(1), " +
+                "#metadata a[href^=/magazines] span:nth-child(1), " +
+                "#metadata a[href^=/parodies] span:nth-child(1), " +
+                "#metadata div:contains(Category) span",
+        ).joinToString { it.text().trim() }
+        description = document.select("#metadata div:contains(length) span").text()
+            .let { "Length: $it" }
+        status = SManga.COMPLETED
+        update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
     }
 
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> {
@@ -253,10 +301,11 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     companion object {
         private val pageNumRegex by lazy { Regex("""(\d+)\w+""") }
         private const val qualityPref = "pref_image_quality"
+        const val PREFIX_ID = "ID:"
+        const val PREFIX_PAGE = "page:"
     }
 
     // unused
-    override fun mangaDetailsParse(document: Document) = throw UnsupportedOperationException("Not Used")
     override fun chapterFromElement(element: Element) = throw UnsupportedOperationException("Not Used")
     override fun chapterListSelector() = ""
     override fun imageUrlParse(document: Document) = throw UnsupportedOperationException("Not Used")
