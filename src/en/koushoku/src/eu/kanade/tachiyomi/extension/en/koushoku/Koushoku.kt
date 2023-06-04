@@ -118,7 +118,7 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
 
     private fun browsePageRequest(pathSegment: String, page: Int): Request {
         val url = baseUrl.toHttpUrl().newBuilder().apply {
-            addEncodedPathSegments(pathSegment)
+            addPathSegments(pathSegment)
             if (page > 1) addPathSegment("page/$page")
         }.build()
 
@@ -301,7 +301,7 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     companion object {
         private val pageNumRegex by lazy { Regex("""(\d+)\w+""") }
         private const val qualityPref = "pref_image_quality"
-        const val PREFIX_ID = "ID:"
+        const val PREFIX_ID = "id:"
         const val PREFIX_PAGE = "page:"
     }
 
