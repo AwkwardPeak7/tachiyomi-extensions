@@ -63,7 +63,8 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     }
 
     override fun popularMangaRequest(page: Int): Request {
-        return GET("$baseUrl/popular/weekly".page(page), headers)
+        val url = "$baseUrl/popular/weekly".page(page)
+        return GET(url, headers)
     }
 
     override fun popularMangaSelector() = "#galleries article"

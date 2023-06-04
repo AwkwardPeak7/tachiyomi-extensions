@@ -97,7 +97,7 @@ open class TextFilter(
 
 class TextBox(name: String) : Filter.Text(name)
 
-class ConditionFilter() : Filter.Select<String>("Mode", arrayOf("OR", "AND"))
+class ConditionFilter : Filter.Select<String>("Mode", arrayOf("OR", "AND"))
 
 open class TextModeFilter(
     name: String,
