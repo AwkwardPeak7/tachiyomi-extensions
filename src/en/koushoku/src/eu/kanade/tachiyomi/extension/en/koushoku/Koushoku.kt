@@ -6,6 +6,7 @@ import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.asObservable
+import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.network.interceptor.rateLimit
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -15,6 +16,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.UpdateStrategy
 import eu.kanade.tachiyomi.source.online.ParsedHttpSource
+import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -44,7 +46,7 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     override val versionId = 2
 
     override val client: OkHttpClient = network.cloudflareClient.newBuilder()
-        .rateLimit(4)
+        .rateLimit(2)
         .build()
 
     override fun headersBuilder() = super.headersBuilder()
@@ -104,6 +106,11 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
                     false,
                 )
             }
+        } else if (filters.findInstance<PseudoSeries>()?.state == true) {
+            client.newCall(searchMangaRequest(page, query, filters))
+                .asObservableSuccess()
+                .map { pseudoSeriesParse(it) }
+                .map { MangasPage(listOf(it), false) }
         } else {
             client.newCall(searchMangaRequest(page, query, filters))
                 .asObservableIgnoreCode(404)
@@ -163,11 +170,42 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     override fun searchMangaFromElement(element: Element) = popularMangaFromElement(element)
     override fun getFilterList() = filters
 
-    override fun fetchMangaDetails(manga: SManga): Observable<SManga> {
-        return if (manga.initialized) {
-            Observable.just(manga)
+    private fun pseudoSeriesParse(response: Response): SManga {
+        val requestUrl = response.request.url
+        val document = response.asJsoup()
+
+        val parameters = requestUrl.queryParameterNames.toList()
+        val titleIndex = parameters.indexOf("title").takeUnless { it == -1 }
+            ?: parameters.indexOf("s")
+        val artistIndex = parameters.indexOf("a")
+
+        val manga = SManga.create().apply {
+            setUrlWithoutDomain("$requestUrl#pseudo")
+            document.select(searchMangaSelector()).let { elements ->
+                title = runCatching {
+                    requestUrl.queryParameterValue(titleIndex)!!
+                }.getOrElse {
+                    elements.select("a").attr("title")
+                }
+                genre = elements.select("footer span")
+                    .map { it.text() }
+                    .distinct()
+                    .joinToString()
+                thumbnail_url = elements.select("img").first()?.attr("abs:src")
+            }
+            author = runCatching { requestUrl.queryParameterValue(artistIndex)!! }.getOrNull()
+            initialized = true
+            status = SManga.ONGOING
+        }
+
+        return manga
+    }
+
+    override fun mangaDetailsParse(response: Response): SManga {
+        return if (response.request.url.fragment.isNullOrEmpty()) {
+            super.mangaDetailsParse(response)
         } else {
-            super.fetchMangaDetails(manga)
+            pseudoSeriesParse(response)
         }
     }
 
@@ -190,17 +228,38 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
     }
 
+    override fun getMangaUrl(manga: SManga): String {
+        return "$baseUrl${manga.url.substringBeforeLast("#")}"
+    }
+
     override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> {
-        return Observable.just(
-            listOf(
-                SChapter.create().apply {
-                    name = "Chapter"
-                    url = manga.url
-                        .replace("/view/", "/read/")
-                        .let { "$it/1" }
-                },
-            ),
-        )
+        return if (manga.url.substringAfterLast("#", "").isEmpty()) {
+            Observable.just(
+                listOf(
+                    SChapter.create().apply {
+                        name = "Chapter"
+                        url = manga.url
+                            .replace("/view/", "/read/")
+                            .let { "$it/1" }
+                    },
+                ),
+            )
+        } else {
+            super.fetchChapterList(manga)
+        }
+    }
+
+    override fun chapterListSelector() = searchMangaSelector()
+
+    override fun chapterFromElement(element: Element) = SChapter.create().apply {
+        element.select("a").let { it ->
+            setUrlWithoutDomain(
+                it.attr("href")
+                    .replace("/view/", "/read/")
+                    .let { "$it/1" },
+            )
+            name = it.attr("title")
+        }
     }
 
     override fun pageListParse(document: Document): List<Page> {
@@ -274,6 +333,8 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
             }
     }
 
+    private inline fun <reified T> Iterable<*>.findInstance() = find { it is T } as? T
+
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         ListPreference(screen.context).apply {
             key = qualityPref
@@ -295,7 +356,5 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
     }
 
     // unused
-    override fun chapterFromElement(element: Element) = throw UnsupportedOperationException("Not Used")
-    override fun chapterListSelector() = ""
     override fun imageUrlParse(document: Document) = throw UnsupportedOperationException("Not Used")
 }

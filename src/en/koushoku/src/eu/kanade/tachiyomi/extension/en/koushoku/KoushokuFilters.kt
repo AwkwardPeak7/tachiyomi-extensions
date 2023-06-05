@@ -22,6 +22,8 @@ val filters = FilterList(
     ParodyFilter(),
     MagazineFilter(),
     PageFilter(),
+    Filter.Separator(),
+    PseudoSeries(),
 )
 
 class SortFilter(
@@ -124,3 +126,5 @@ open class TextModeFilter(
         }
     }
 }
+
+class PseudoSeries : Filter.CheckBox("Convert to Pseudo Series")
