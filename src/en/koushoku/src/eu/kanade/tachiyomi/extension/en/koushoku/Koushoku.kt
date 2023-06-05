@@ -32,6 +32,7 @@ import org.jsoup.nodes.Element
 import rx.Observable
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.lang.IllegalArgumentException
 
 class Koushoku : ParsedHttpSource(), ConfigurableSource {
 
@@ -311,9 +312,13 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         @SerialName("n") val file: String,
     )
 
-    private fun String.baseUrl(): String {
-        val url = this.toHttpUrl()
-        return "${url.scheme}://${url.host}"
+    private fun String.baseUrl(): String? {
+        return try {
+            val url = this.toHttpUrl()
+            "${url.scheme}://${url.host}"
+        } catch (e: IllegalArgumentException) {
+            null
+        }
     }
 
     private fun Call.asObservableIgnoreCode(code: Int): Observable<Response> {
