@@ -15,6 +15,7 @@ val filters = FilterList(
             Sortable("Popularity", "32"),
         ),
     ),
+    CategoryFilter(),
     TitleFilter(),
     TagFilter(),
     ArtistFilter(),
@@ -58,6 +59,37 @@ data class Sortable(
     val value: String,
 ) {
     override fun toString(): String = title
+}
+
+class Category(name: String, state: Boolean) : Filter.CheckBox(name, state)
+class CategoryFilter : Filter.Group<Category>(
+    "Cateogries",
+    listOf(
+        Category("Manga", true),
+        Category("Doujinshi", true),
+        Category("Illustration", true),
+    ),
+) {
+    fun addQueryParameter(url: HttpUrl.Builder) {
+        val checked = state.map { it.state }
+        val manga = checked[0]
+        val doujin = checked[1]
+        val illustration = checked[2]
+
+        if (!manga && doujin && illustration) {
+            url.addQueryParameter("cat", "6")
+        } else if (manga && !doujin && illustration) {
+            url.addQueryParameter("cat", "5")
+        } else if (manga && doujin && !illustration) {
+            url.addQueryParameter("cat", "3")
+        } else if (manga && !doujin) {
+            url.addQueryParameter("cat", "1")
+        } else if (!manga && doujin) {
+            url.addQueryParameter("cat", "2")
+        } else if (!manga && illustration) {
+            url.addQueryParameter("cat", "4")
+        }
+    }
 }
 
 class TitleFilter : Filter.Group<TextFilter>(

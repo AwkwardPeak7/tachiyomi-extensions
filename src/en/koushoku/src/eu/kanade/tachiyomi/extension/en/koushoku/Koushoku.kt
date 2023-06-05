@@ -129,6 +129,7 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         filters.forEach { filter ->
             when (filter) {
                 is SortFilter -> filter.addQueryParameter(url)
+                is CategoryFilter -> filter.addQueryParameter(url)
                 is TitleFilter -> filter.addQueryParameter(url)
                 is TagFilter -> filter.addQueryParameter(url)
                 is ArtistFilter -> filter.addQueryParameter(url)
