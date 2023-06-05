@@ -19,13 +19,6 @@
 
                 <data android:pathPattern="/view/..*" />
                 <data android:pathPattern="/read/..*" />
-
-                <data android:pathPattern="/artists/..*" />
-                <data android:pathPattern="/magazines/..*" />
-                <data android:pathPattern="/tags/..*" />
-                <data android:pathPattern="/circles/..*" />
-                <data android:pathPattern="/parodies/..*" />
-
             </intent-filter>
         </activity>
     </application>

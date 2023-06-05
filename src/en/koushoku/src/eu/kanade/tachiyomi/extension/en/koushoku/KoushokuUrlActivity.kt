@@ -14,36 +14,9 @@ class KoushokuUrlActivity : Activity() {
         if (pathSegments != null && pathSegments.size > 1) {
             val mainIntent = Intent().apply {
                 action = "eu.kanade.tachiyomi.SEARCH"
-                val page = pathSegments[0]
-                val query = with(page) {
-                    when {
-                        equals("view") -> {
-                            val id = pathSegments[1]
-                            val key = pathSegments[2]
-                            "${Koushoku.PREFIX_ID}$id/$key"
-                        }
-                        equals("read") -> {
-                            val id = pathSegments[1]
-                            val key = pathSegments[2]
-                            "${Koushoku.PREFIX_ID}$id/$key"
-                        }
-                        else -> {
-                            val subPage = pathSegments[1]
-                            with(subPage) {
-                                when {
-                                    equals("page") -> {
-                                        finish()
-                                        exitProcess(0)
-                                    }
-                                    else -> {
-                                        "${Koushoku.PREFIX_PAGE}$page/$subPage"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                putExtra("query", query)
+                val id = pathSegments[1]
+                val key = pathSegments[2]
+                putExtra("query", "${Koushoku.PREFIX_ID}$id/$key")
                 putExtra("filter", packageName)
             }
 

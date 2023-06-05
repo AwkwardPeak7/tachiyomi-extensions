@@ -6,7 +6,6 @@ import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.asObservable
-import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.network.interceptor.rateLimit
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -105,25 +104,11 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
                     false,
                 )
             }
-        } else if (query.startsWith(PREFIX_PAGE)) {
-            val pathSegment = query.substringAfter(PREFIX_PAGE)
-            client.newCall(browsePageRequest(pathSegment, page))
-                .asObservableSuccess()
-                .map { searchMangaParse(it) }
         } else {
             client.newCall(searchMangaRequest(page, query, filters))
                 .asObservableIgnoreCode(404)
                 .map { searchMangaParse(it) }
         }
-    }
-
-    private fun browsePageRequest(pathSegment: String, page: Int): Request {
-        val url = baseUrl.toHttpUrl().newBuilder().apply {
-            addPathSegments(pathSegment)
-            if (page > 1) addPathSegment("page/$page")
-        }.build()
-
-        return GET(url, headers)
     }
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
@@ -307,7 +292,6 @@ class Koushoku : ParsedHttpSource(), ConfigurableSource {
         private val pageNumRegex by lazy { Regex("""(\d+)\w+""") }
         private const val qualityPref = "pref_image_quality"
         const val PREFIX_ID = "id:"
-        const val PREFIX_PAGE = "browse:"
     }
 
     // unused
