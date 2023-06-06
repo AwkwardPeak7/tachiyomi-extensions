@@ -77,8 +77,8 @@ abstract class LibGroup(
         }
     }
     override val client: OkHttpClient = network.cloudflareClient.newBuilder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(1, TimeUnit.MINUTES)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .rateLimit(2)
         .addInterceptor { chain ->
             val response = chain.proceed(chain.request())
@@ -217,7 +217,7 @@ abstract class LibGroup(
 
         val rawAgeStop = document.select(".media-short-info .media-short-info__item[data-caution]").text()
 
-        val ratingValue = document.select(".media-rating__value").last()!!.text().toFloat() * 2
+        val ratingValue = document.select(".media-rating__value").last()!!.text().toFloat()
         val ratingVotes = document.select(".media-rating__votes").last()!!.text()
         val ratingStar = when {
             ratingValue > 9.5 -> "★★★★★"
@@ -489,7 +489,7 @@ abstract class LibGroup(
     }
 
     private fun checkImage(url: String): Boolean {
-        val response = client.newCall(Request.Builder().url(url).head().headers(headers).build()).execute()
+        val response = client.newCall(Request.Builder().url(url).headers(headers).build()).execute()
         return response.isSuccessful && (response.header("content-length", "0")?.toInt()!! > 600)
     }
 
