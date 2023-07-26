@@ -44,7 +44,6 @@ class HentaiForce : ParsedHttpSource() {
         return GET(url, headers)
     }
 
-
     override fun popularMangaSelector() = ".listing-galleries-container > .gallery-wrapper"
     override fun popularMangaNextPageSelector() = ".page-item a[rel=next]"
 
@@ -90,7 +89,7 @@ class HentaiForce : ParsedHttpSource() {
         val b64 = script.substringAfter("atob(\"")
             .substringBefore("\")")
 
-        val rawJson = Base64.decode(b64, Base64.DEFAULT).toString(charset("UTF-8"))
+        val rawJson = Base64.decode(b64, Base64.DEFAULT).let(::String)
 
         val hentaiForcePages = json.decodeFromString<HentaiForcePages>(rawJson)
 
@@ -98,8 +97,8 @@ class HentaiForce : ParsedHttpSource() {
             Page(
                 index = idx,
                 imageUrl = hentaiForcePages.imgUrl
-                    .replace("%c", hentaiForcePages.pages[key]!!.l)
-                    .replace("%s", hentaiForcePages.pages[key]!!.f),
+                    .replace("%c", hentaiForcePages.pages[key]!!.location)
+                    .replace("%s", hentaiForcePages.pages[key]!!.fileName),
             )
         }
     }
@@ -113,8 +112,8 @@ class HentaiForce : ParsedHttpSource() {
 
     @Serializable
     data class HentaiForcePage(
-        val l: String,
-        val f: String,
+        @SerialName("l") val location: String,
+        @SerialName("f") val fileName: String,
     )
 
     private fun Elements.imgAttr(): String {
