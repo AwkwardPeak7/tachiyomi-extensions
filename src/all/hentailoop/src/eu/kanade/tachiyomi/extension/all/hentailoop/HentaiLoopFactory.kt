@@ -4,7 +4,7 @@ import eu.kanade.tachiyomi.source.SourceFactory
 
 class HentaiLoopFactory : SourceFactory {
     override fun createSources() = listOf(
-        HentaiLoop("all", "/manga/", emptyList()),
+        HentaiLoop("all", "/manga/", null),
         HentaiLoop("en", "/languages/english/", "6"),
         HentaiLoop("zh", "/languages/chinese/", "7988"),
         HentaiLoop("ja", "/languages/japanese/", "1682"),

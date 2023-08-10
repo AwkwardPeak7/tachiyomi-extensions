@@ -2,57 +2,6 @@ package eu.kanade.tachiyomi.extension.all.hentailoop
 
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
-/*
-class HentaiLoopFilters(
-    private val baseUrl: String,
-    private val client: OkHttpClient,
-    private val headerBuilder: () -> Headers.Builder
-) {
-    private val json: Json by injectLazy()
-
-    private var tags: List<Pair<String, String>> = emptyList()
-    private var tagsFetchAttempt = 0
-    private var tagsFetchFailed = false
-
-    fun fetchGenre() {
-        if (tagsFetchAttempt < 3 && (tags.isEmpty() || tagsFetchFailed)) {
-            val result = runCatching {
-                client.newCall(fetchGenreRequest()).execute().use(::genresParse)
-            }
-
-            tags = result.getOrNull().orEmpty()
-            tagsFetchFailed = result.isFailure
-            tagsFetchAttempt++
-        }
-    }
-
-    private fun fetchGenreRequest(): Request {
-        val body = FormBody.Builder().apply {
-            add("action", "advanced_search")
-            add("subAction", "get_taxs_by_query")
-            add("query", "")
-            add("taxonomyType", "post_tag")
-        }.build()
-
-        val headers = headerBuilder()
-            .add("Content-Length", body.contentLength().toString())
-            .add("Content-Type", body.contentType().toString())
-            .build()
-
-        return POST("$baseUrl/wp-admin/admin-ajax.php", headers, body)
-    }
-
-    private fun genresParse(response: Response): List<Pair<String, String>> {
-        val result = json.decodeFromString<TaxasResponse>(response.body.string())
-
-        return result.items.map {
-            Pair(it.name, it.id)
-        }
-    }
-
-
-
-}*/
 
 class TriFilter(name: String, val id: String) : Filter.TriState(name)
 

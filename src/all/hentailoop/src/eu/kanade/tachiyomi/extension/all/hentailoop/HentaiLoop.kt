@@ -21,7 +21,6 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import okhttp3.FormBody
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.Jsoup
@@ -34,13 +33,8 @@ import java.lang.Exception
 open class HentaiLoop(
     final override val lang: String,
     private val browsePath: String,
-    private val langIds: List<String>,
+    private val langId: String?,
 ) : ParsedHttpSource() {
-    constructor(
-        name: String,
-        browsePath: String,
-        langId: String,
-    ) : this(name, browsePath, listOf(langId))
 
     override val name = "HentaiLoop"
 
@@ -56,8 +50,6 @@ open class HentaiLoop(
 
     override fun headersBuilder() = super.headersBuilder()
         .add("Referer", baseUrl)
-
-    private var offset = 0
 
     override fun popularMangaRequest(page: Int): Request {
         val url = baseUrl + browsePath + pagePath(page)
@@ -84,6 +76,8 @@ open class HentaiLoop(
     override fun latestUpdatesNextPageSelector() = popularMangaNextPageSelector()
     override fun latestUpdatesSelector() = popularMangaSelector()
 
+    private var offset = 0
+
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
         if (page == 1) offset = 0
 
@@ -94,7 +88,7 @@ open class HentaiLoop(
                     put("name", "manga-genres")
                     putJsonArray("filterValues") {
                         (filters.firstInstanceOrNull<GenreFilter>()?.checked ?: emptyList())
-                            .forEach { add(it) }
+                            .forEach(::add)
                     }
                     put("operator", "in")
                 }
@@ -102,7 +96,7 @@ open class HentaiLoop(
                     put("name", "post_tag")
                     putJsonArray("filterValues") {
                         (filters.firstInstanceOrNull<TagFilter>()?.included ?: emptyList())
-                            .forEach { add(it) }
+                            .forEach(::add)
                     }
                     put("operator", "in")
                 }
@@ -110,13 +104,13 @@ open class HentaiLoop(
                     put("name", "post_tag")
                     putJsonArray("filterValues") {
                         (filters.firstInstanceOrNull<TagFilter>()?.excluded ?: emptyList())
-                            .forEach { add(it) }
+                            .forEach(::add)
                     }
                     put("operator", "ex")
                 }
                 addJsonObject {
                     put("name", "manga-languages")
-                    putJsonArray("filterValues") { langIds.forEach { add(it) } }
+                    putJsonArray("filterValues") { langId?.let(::add) }
                     put("operator", "in")
                 }
             }
@@ -152,8 +146,8 @@ open class HentaiLoop(
         }.build()
 
         val ajaxHeaders = headersBuilder()
-            .add("X-Requested-With", "XMLHttpRequest")
             .set("Referer", "$baseUrl/manga-service/advanced-search/")
+            .add("X-Requested-With", "XMLHttpRequest")
             .add("Content-Length", requestBody.contentLength().toString())
             .add("Content-Type", requestBody.contentType().toString())
             .build()
@@ -166,7 +160,7 @@ open class HentaiLoop(
     override fun searchMangaParse(response: Response): MangasPage {
         val result = json.decodeFromString<AjaxSearchResponse>(response.body.string())
 
-        if (result.success.not()) {
+        if (!result.success) {
             if (result.data.type == "captcha") {
                 throw Exception("Solve captcha under Advanced Search in WebView")
             }
@@ -188,6 +182,15 @@ open class HentaiLoop(
         return MangasPage(entries, hasNextPage)
     }
 
+    override fun searchMangaFromElement(element: Element) = SManga.create().apply {
+        setUrlWithoutDomain(element.selectFirst("div.left-side a")!!.attr("href"))
+        thumbnail_url = element.selectFirst("img")?.attr("abs:src")
+        title = element.selectFirst("div.title")!!.ownText()
+    }
+
+    override fun searchMangaSelector() = ""
+    override fun searchMangaNextPageSelector() = null
+
     @Serializable
     data class AjaxSearchResponse(
         val data: SearchData,
@@ -202,15 +205,6 @@ open class HentaiLoop(
         val posts: List<String>? = emptyList(),
         val more: Boolean? = false,
     )
-
-    override fun searchMangaFromElement(element: Element) = SManga.create().apply {
-        setUrlWithoutDomain(element.selectFirst("div.left-side a")!!.attr("href"))
-        thumbnail_url = element.selectFirst("img")?.attr("abs:src")
-        title = element.selectFirst("div.title")!!.ownText()
-    }
-
-    override fun searchMangaSelector() = ""
-    override fun searchMangaNextPageSelector() = null
 
     override fun mangaDetailsParse(document: Document) = SManga.create().apply {
         title = document.select("div.manga-title").text()
