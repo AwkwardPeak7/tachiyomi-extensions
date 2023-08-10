@@ -35,7 +35,7 @@ abstract class SelectFilterGroup(
 
 abstract class CheckFilterGroup(
     name: String,
-    private val options: List<Pair<String, String>>,
+    options: List<Pair<String, String>>,
 ) : Filter.Group<CheckFilter>(
     name,
     options.map { CheckFilter(it.first, it.second) },
