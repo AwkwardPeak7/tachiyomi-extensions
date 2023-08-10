@@ -209,13 +209,15 @@ open class HentaiLoop(
     override fun mangaDetailsParse(document: Document) = SManga.create().apply {
         title = document.select("div.manga-title").text()
         document.select("div.manga-summary").let { element ->
-            author = element.select("a[href*=/artists/]").text()
+            author = element.select("a[href*=/artists/]")
+                .joinToString { it.text().trim() }
             genre = element.select("a[rel=tag]")
                 .joinToString { it.text().trim() }
         }
         description = document.select("div.pre-meta:not([id=download]) div")
-            .joinToString("\n", postfix = "\n\n") { it.text().trim() }
-        description += document.selectFirst("div.desc-itself .text")?.text() ?: ""
+            .joinToString("\n") { it.text().trim() }
+        description += document.selectFirst("div.desc-itself .text")
+            ?.text()?.let { "\n\n$it" } ?: ""
         status = SManga.COMPLETED
         update_strategy = UpdateStrategy.ONLY_FETCH_ONCE
     }
