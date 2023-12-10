@@ -9,4 +9,8 @@ ext {
     extVersionCode = 1
 }
 
+dependencies {
+    compileOnly 'com.github.AwkwardPeak7:extensions-lib:1.5-new-SNAPSHOT'
+}
+
 apply from: "$rootDir/common.gradle"

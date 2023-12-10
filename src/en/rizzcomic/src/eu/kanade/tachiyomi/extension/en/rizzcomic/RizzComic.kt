@@ -2,7 +2,7 @@ package eu.kanade.tachiyomi.extension.en.rizzcomic
 
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
-import eu.kanade.tachiyomi.network.asObservableSuccess
+import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -10,18 +10,21 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.source.online.ResolvableSource
+import eu.kanade.tachiyomi.source.online.UriType
 import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import okhttp3.Response
-import rx.Observable
 import uy.kohesive.injekt.injectLazy
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class RizzComic : HttpSource() {
+class RizzComic : HttpSource(), ResolvableSource {
 
     override val name = "Rizz Comic"
 
@@ -106,6 +109,52 @@ class RizzComic : HttpSource() {
         return POST("$baseUrl/Index/filter_series", apiHeaders, form)
     }
 
+    override fun getUriType(uri: String): UriType {
+        val url = uri.toHttpUrlOrNull() ?: return UriType.Unknown
+        if (url.host != baseUrl.toHttpUrl().host) return UriType.Unknown
+        val path = url.pathSegments
+
+        return if (path.size >= 2 && path[0] == "series") {
+            UriType.Manga
+        } else if (path.size >= 2 && path[0] == "chapter") {
+            UriType.Chapter
+        } else {
+            UriType.Unknown
+        }
+    }
+
+    override suspend fun getManga(uri: String): SManga? {
+        return runCatching {
+            val slug = if (uri.contains("/series/")) {
+                uri.substringAfter("/series/").split("-").let {
+                    urlPrefix = it[0]
+                    it.drop(1).joinToString("-")
+                }
+            } else {
+                uri.substringAfter("/chapter/").split("-").let {
+                    urlPrefix = it[0]
+                    it.drop(1).dropLast(2).joinToString("-")
+                }
+            }
+            val title = slug.replace("-", " ")
+            val newerManga = getSearchManga(1, title, getFilterList()).mangas.firstOrNull {
+                it.url.substringBefore("#") == slug
+            }
+
+            return newerManga
+        }.getOrNull()
+    }
+
+    override suspend fun getChapter(uri: String): SChapter? {
+        return runCatching {
+            val chapSlug = uri.substringAfter("/chapter/").substringAfter("-")
+            return SChapter.create().apply {
+                url = chapSlug
+                name = "Chapter ${chapSlug.substringAfterLast("-")}"
+            }
+        }.getOrNull()
+    }
+
     override fun getFilterList(): FilterList {
         val filters: MutableList<Filter<*>> = mutableListOf(
             Filter.Header("Filters don't work with text search"),
@@ -155,10 +204,10 @@ class RizzComic : HttpSource() {
         return MangasPage(entries, false)
     }
 
-    override fun fetchMangaDetails(manga: SManga): Observable<SManga> {
+    override suspend fun getMangaDetails(manga: SManga): SManga {
         return client.newCall(mangaDetailsRequest(manga))
-            .asObservableSuccess()
-            .map { mangaDetailsParse(it, manga) }
+            .awaitSuccess()
+            .let { mangaDetailsParse(it, manga) }
     }
 
     override fun mangaDetailsRequest(manga: SManga): Request {
@@ -183,7 +232,7 @@ class RizzComic : HttpSource() {
         artist = document.selectFirst(".tsinfo .imptdt:contains(artist) a")?.ownText()
         author = listOfNotNull(
             document.selectFirst(".tsinfo .imptdt:contains(author) a")?.ownText(),
-            document.selectFirst(".tsinfo .imptdt:contains(serialization) a")?.ownText()
+            document.selectFirst(".tsinfo .imptdt:contains(serialization) a")?.ownText(),
         ).joinToString()
         genre = buildList {
             add(
@@ -211,6 +260,10 @@ class RizzComic : HttpSource() {
         val slug = manga.url.substringBefore("#")
 
         return GET("$baseUrl/index/search_chapters/$id#$slug", apiHeaders)
+    }
+
+    override fun chapterPageParse(response: Response): SChapter {
+        throw UnsupportedOperationException()
     }
 
     override fun chapterListParse(response: Response): List<SChapter> {
