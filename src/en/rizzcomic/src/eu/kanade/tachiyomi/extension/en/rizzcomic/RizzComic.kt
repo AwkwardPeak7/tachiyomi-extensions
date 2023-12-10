@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.extension.en.rizzcomic
 
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
+import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -15,6 +16,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.Request
 import okhttp3.Response
+import rx.Observable
 import uy.kohesive.injekt.injectLazy
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -136,12 +138,12 @@ class RizzComic : HttpSource() {
                 url = "${comic.slug}#${comic.id}"
                 title = comic.title
                 description = comic.synopsis
-                author = comic.author
+                author = listOfNotNull(comic.author, comic.serialization).joinToString()
                 artist = comic.artist
                 status = comic.status.parseStatus()
                 thumbnail_url = comic.cover?.let { "$baseUrl/assets/images/$it" }
                 genre = buildList {
-                    add(comic.type?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() })
+                    add(comic.type?.capitalize())
                     comic.genreIds?.onEach { gId ->
                         add(genreCache.firstOrNull { it.second == gId }?.first)
                     }
@@ -153,6 +155,12 @@ class RizzComic : HttpSource() {
         return MangasPage(entries, false)
     }
 
+    override fun fetchMangaDetails(manga: SManga): Observable<SManga> {
+        return client.newCall(mangaDetailsRequest(manga))
+            .asObservableSuccess()
+            .map { mangaDetailsParse(it, manga) }
+    }
+
     override fun mangaDetailsRequest(manga: SManga): Request {
         val slug = manga.url.substringBefore("#")
         val randomPart = getUrlPrefix()
@@ -160,17 +168,28 @@ class RizzComic : HttpSource() {
         return GET("$baseUrl/series/$randomPart-$slug", headers)
     }
 
-    override fun mangaDetailsParse(response: Response) = SManga.create().apply {
+    override fun getMangaUrl(manga: SManga): String {
+        val slug = manga.url.substringBefore("#")
+
+        val urlPart = urlPrefix?.let { "$it-" } ?: ""
+
+        return "$baseUrl/series/$urlPart$slug"
+    }
+
+    private fun mangaDetailsParse(response: Response, manga: SManga) = manga.apply {
         val document = response.use { it.asJsoup() }
 
         title = document.selectFirst("h1.entry-title")?.text().orEmpty()
         artist = document.selectFirst(".tsinfo .imptdt:contains(artist) a")?.ownText()
-        author = document.selectFirst(".tsinfo .imptdt:contains(author) a")?.ownText()
+        author = listOfNotNull(
+            document.selectFirst(".tsinfo .imptdt:contains(author) a")?.ownText(),
+            document.selectFirst(".tsinfo .imptdt:contains(serialization) a")?.ownText()
+        ).joinToString()
         genre = buildList {
             add(
                 document.selectFirst(".tsinfo .imptdt:contains(type) a")
                     ?.ownText()
-                    ?.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() },
+                    ?.capitalize(),
             )
             document.select(".mgen a").eachText().onEach { add(it) }
         }.filterNotNull().joinToString()
@@ -180,10 +199,10 @@ class RizzComic : HttpSource() {
 
     private fun String?.parseStatus(): Int = when {
         this == null -> SManga.UNKNOWN
-        listOf("ongoing", "publishing").any { this.contains(it, ignoreCase = true) } -> SManga.ONGOING
-        this.contains("hiatus", ignoreCase = true) -> SManga.ON_HIATUS
-        this.contains("completed", ignoreCase = true) -> SManga.COMPLETED
-        listOf("dropped", "cancelled").any { this.contains(it, ignoreCase = true) } -> SManga.CANCELLED
+        listOf("ongoing", "publishing").any { contains(it, ignoreCase = true) } -> SManga.ONGOING
+        contains("hiatus", ignoreCase = true) -> SManga.ON_HIATUS
+        contains("completed", ignoreCase = true) -> SManga.COMPLETED
+        listOf("dropped", "cancelled").any { contains(it, ignoreCase = true) } -> SManga.CANCELLED
         else -> SManga.UNKNOWN
     }
 
@@ -232,6 +251,10 @@ class RizzComic : HttpSource() {
         return GET(page.imageUrl!!, newHeaders)
     }
 
+    override fun mangaDetailsParse(response: Response): SManga {
+        throw UnsupportedOperationException("Not Used")
+    }
+
     override fun imageUrlParse(response: Response): String {
         throw UnsupportedOperationException("Not Used")
     }
@@ -240,6 +263,14 @@ class RizzComic : HttpSource() {
         use { it.body.string() }.let(json::decodeFromString)
 
     companion object {
+        private fun String.capitalize() = replaceFirstChar {
+            if (it.isLowerCase()) {
+                it.titlecase(Locale.ROOT)
+            } else {
+                it.toString()
+            }
+        }
+
         private val dateFormat by lazy {
             SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ENGLISH)
         }
